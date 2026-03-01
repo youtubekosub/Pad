@@ -1,4 +1,4 @@
-name: Padlet Auto Sync
+Name: Padlet Auto Sync
 
 on:
   schedule:
@@ -30,7 +30,7 @@ jobs:
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          if [ -f padlet_export.md ]; then
+          if [ -f information.md ]; then
             git add information.md
             if git diff --staged --quiet; then
               echo "No changes to commit"
