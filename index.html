@@ -93,7 +93,7 @@
         .action-link {
             display: inline-block; font-size: 0.7rem; padding: 6px 12px; 
             background: #f3f4f6; border-radius: 6px; text-decoration: none; 
-            color: #3b82f6; font-weight: 600; border: 1px solid #e5e7eb;
+            color: #3b82f6 !important; font-weight: 600; border: 1px solid #e5e7eb;
             overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         }
         .action-link:hover { background: #ebf2ff; border-color: #3b82f6; }
@@ -109,7 +109,10 @@
             display: flex; flex-direction: column; gap: 6px;
         }
         .comment-item { font-size: 0.75rem; background: #f9fafb; padding: 8px; border-radius: 6px; border: 1px solid #f3f4f6; }
-        .comment-user { font-weight: 700; color: #374151; margin-right: 4px; }
+        .comment-top { display: flex; justify-content: space-between; margin-bottom: 2px; }
+        .comment-user { font-weight: 700; color: #374151; }
+        .comment-date { font-size: 0.7rem; color: #9ca3af; }
+        .comment-msg { color: #4b5563; word-break: break-all; }
 
         /* Skeleton */
         .skeleton-card { background: #fff; height: 120px; border-radius: 10px; animation: pulse 1.5s infinite; }
@@ -206,23 +209,21 @@
             // コンテンツの抽出
             let content = text.replace(/^.*?\n/, '').replace(/- \*\*.*?\*\*.*\n/g, '').split('####')[0].trim();
             
-            // 画像とリンクの高度な抽出
             let imageUrl = null;
             let linkInfo = [];
 
-            // 1. 画像を抽出（本文から除去）
+            // 画像の抽出
             content = content.replace(/!\[.*?\]\((.*?)\)/gi, (m, url) => { 
                 if (!imageUrl) imageUrl = url; 
                 return ''; 
             });
 
-            // 2. リンクを抽出（「attachment1」のようなものを防ぎ、タイトルを保持）
+            // リンクの抽出
             content = content.replace(/\[(.*?)\]\((.*?)\)/gi, (m, label, url) => {
-                // 画像URLでなければリンク集に追加
                 if (!/\.(jpg|jpeg|png|gif|webp)$/i.test(url)) {
                     linkInfo.push({ label: label, url: url });
                 }
-                return ''; // 本文からは一旦消して、後で専用エリアに表示
+                return ''; 
             });
 
             return {
@@ -233,14 +234,19 @@
 
         function parseComments(text) {
             const comments = [];
-            // "#### Comments" 以降のセクションを抽出
-            const match = text.match(/#### Comments\n([\s\S]*?)(?=####|$)/i);
+            const match = text.match(/#### (?:Comments|コメント)\n([\s\S]*?)(?=####|$)/i);
             if (match) {
-                // 各行（- **User**: Msg）をパース
                 const commentLines = match[1].trim().split('\n');
                 commentLines.forEach(line => {
-                    const m = line.match(/- \*\*(.*?)\*\*.*?: (.*)/);
-                    if (m) comments.push({ user: m[1], msg: m[2] });
+                    // 書式 "- **User** (Date): Msg" または "- **User**: Msg" に対応
+                    const m = line.match(/- \*\*(.*?)\*\*(?:\s\((.*?)\))?: (.*)/);
+                    if (m) {
+                        comments.push({ 
+                            user: m[1], 
+                            date: m[2] || '', 
+                            msg: m[3] 
+                        });
+                    }
                 });
             }
             return comments;
@@ -248,7 +254,7 @@
 
         function createCardElement(data) {
             const el = document.createElement('div');
-            const c = data.color.toLowerCase();
+            const c = (data.color || 'white').toLowerCase();
             let colorClass = 'color-white';
             ['red', 'yellow', 'green', 'blue', 'purple'].forEach(color => { 
                 if (c.includes(color)) colorClass = `color-${color}`; 
@@ -286,8 +292,11 @@
                     <div class="comments-section">
                         ${data.comments.map(c => `
                             <div class="comment-item">
-                                <span class="comment-user">${escapeHtml(c.user)}:</span>
-                                <span>${escapeHtml(c.msg)}</span>
+                                <div class="comment-top">
+                                    <span class="comment-user">${escapeHtml(c.user)}</span>
+                                    ${c.date ? `<span class="comment-date">${escapeHtml(c.date)}</span>` : ''}
+                                </div>
+                                <div class="comment-msg">${escapeHtml(c.msg)}</div>
                             </div>
                         `).join('')}
                     </div>
