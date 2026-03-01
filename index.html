@@ -69,6 +69,7 @@
         
         .card:hover { transform: translateY(-3px); border-color: #d1d5db; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
 
+        /* Color classes from Post color info */
         .card.color-red { border-top: 5px solid #ef4444; }
         .card.color-yellow { border-top: 5px solid #f59e0b; }
         .card.color-green { border-top: 5px solid #10b981; }
@@ -131,7 +132,6 @@
     </main>
 
     <script>
-        // --- 設定: ここで読み込むファイル名を指定 ---
         const markdownUrl = './information.md';
 
         async function fetchAndRender() {
@@ -191,11 +191,19 @@
             const title = lines[0].trim();
             const getMeta = (regex) => { const m = text.match(regex); return m ? m[1].trim() : null; };
 
-            const color = getMeta(/\*\*Color:\*\* (.*)/i) || 'White';
-            const date = getMeta(/\*\*Created At:\*\* (.*)/i) || '';
+            // "Post color:" または "**Color:**" の両方に対応
+            const color = getMeta(/Post color:\s*(.*)/i) || getMeta(/\*\*Color:\*\* (.*)/i) || 'White';
+            const date = getMeta(/Created At \(UTC\):\s*(.*)/i) || getMeta(/\*\*Created At:\*\* (.*)/i) || '';
             const rating = parseFloat(getMeta(/star rating.*?([\d\.]+)/i) || 0);
 
-            let content = text.replace(/^.*?\n/, '').replace(/- \*\*.*?\*\*.*\n/g, '').split('####')[0].trim();
+            // Summaryを削除し、メタデータ行を除外
+            let content = text.replace(/^.*?\n/, '') // タイトル削除
+                              .replace(/#### Summary[\s\S]*?(?=####|$)/i, '') // Summaryセクション削除
+                              .replace(/Post color:.*\n/gi, '')
+                              .replace(/Created At \(UTC\):.*\n/gi, '')
+                              .replace(/Updated At \(UTC\):.*\n/gi, '')
+                              .replace(/- \*\*.*?\*\*.*\n/g, '') // その他のメタデータ削除
+                              .split('####')[0].trim();
             
             let imageUrl = null;
             let linkInfo = [];
