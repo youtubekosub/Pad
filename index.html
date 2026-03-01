@@ -69,7 +69,6 @@
         
         .card:hover { transform: translateY(-3px); border-color: #d1d5db; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
 
-        /* Color Bars */
         .card.color-red { border-top: 5px solid #ef4444; }
         .card.color-yellow { border-top: 5px solid #f59e0b; }
         .card.color-green { border-top: 5px solid #10b981; }
@@ -78,8 +77,7 @@
         .card.color-white { border-top: 5px solid #9ca3af; }
 
         .card-title { font-size: 0.95rem; font-weight: 700; margin-bottom: 6px; color: #111827; }
-        .card-meta-header { font-size: 0.75rem; color: #9ca3af; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; }
-        .author-link { color: #3b82f6; text-decoration: none; font-weight: 600; display: flex; align-items: center; }
+        .card-meta-header { font-size: 0.75rem; color: #9ca3af; margin-bottom: 12px; display: flex; align-items: center; justify-content: flex-end; }
 
         .card-content { font-size: 0.85rem; line-height: 1.6; color: #4b5563; overflow-wrap: break-word; }
         
@@ -133,7 +131,8 @@
     </main>
 
     <script>
-        const markdownUrl = './padlet_export.md';
+        // --- 設定: ここで読み込むファイル名を指定 ---
+        const markdownUrl = './information.md';
 
         async function fetchAndRender() {
             const canvas = document.getElementById('board-canvas');
@@ -155,7 +154,7 @@
 
                 renderBoard(markdownContent, canvas);
             } catch (error) {
-                canvas.innerHTML = `<div style="padding:20px; color:#ef4444;">データの読み込みに失敗しました。</div>`;
+                canvas.innerHTML = `<div style="padding:20px; color:#ef4444;">ファイルの読み込みに失敗しました（${markdownUrl}）</div>`;
             }
         }
 
@@ -192,22 +191,15 @@
             const title = lines[0].trim();
             const getMeta = (regex) => { const m = text.match(regex); return m ? m[1].trim() : null; };
 
-            let authorRaw = getMeta(/\*\*Author:\*\* (.*)/i) || 'Unknown';
-            let authorName = authorRaw, authorUrl = null;
-            const authorMatch = authorRaw.match(/^(.*)\s\((.*)\)$/);
-            if (authorMatch) { authorName = authorMatch[1]; authorUrl = `https://padlet.com/${authorMatch[2]}`; }
-
             const color = getMeta(/\*\*Color:\*\* (.*)/i) || 'White';
             const date = getMeta(/\*\*Created At:\*\* (.*)/i) || '';
             const rating = parseFloat(getMeta(/star rating.*?([\d\.]+)/i) || 0);
 
-            // コンテンツの抽出（メタデータ行を除外）
             let content = text.replace(/^.*?\n/, '').replace(/- \*\*.*?\*\*.*\n/g, '').split('####')[0].trim();
             
             let imageUrl = null;
             let linkInfo = [];
 
-            // 画像とリンクの抽出
             content = content.replace(/!\[.*?\]\((.*?)\)/gi, (m, url) => { if (!imageUrl) imageUrl = url; return ''; });
             content = content.replace(/\[(.*?)\]\((.*?)\)/gi, (m, label, url) => {
                 if (!/\.(jpg|jpeg|png|gif|webp)$/i.test(url)) linkInfo.push({ label: label, url: url });
@@ -215,20 +207,17 @@
             });
 
             return {
-                title, author: authorName, authorUrl, color, date, content, imageUrl, linkInfo, rating,
+                title, color, date, content, imageUrl, linkInfo, rating,
                 comments: parseComments(text)
             };
         }
 
         function parseComments(text) {
             const comments = [];
-            // "#### Comments" セクションを探す
             const match = text.match(/#### (?:Comments|コメント)[^\n]*\n([\s\S]*?)(?=####|$)/i);
             if (match) {
                 const commentLines = match[1].trim().split('\n');
                 commentLines.forEach(line => {
-                    // 書式 1: - **Name** (Date): Msg
-                    // 書式 2: - **Name**: Msg
                     const m = line.match(/- \*\*(.*?)\*\*(?:\s\((.*?)\))?:\s?(.*)/);
                     if (m) {
                         comments.push({ 
@@ -257,7 +246,6 @@
             el.innerHTML = `
                 <div class="card-title">${escapeHtml(data.title)}</div>
                 <div class="card-meta-header">
-                    ${data.authorUrl ? `<a href="${data.authorUrl}" target="_blank" class="author-link"><div class="icon icon-user"></div>${escapeHtml(data.author)}</a>` : `<span>${escapeHtml(data.author)}</span>`}
                     <span>${data.date.split(' ')[0]}</span>
                 </div>
                 
