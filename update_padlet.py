@@ -5,7 +5,7 @@ import datetime
 # 取得対象のPadlet URL（Markdownエクスポート用）
 URL = "https://padlet.com/padlets/n0g1c0jl2ak3grc5/exports/markdown.md"
 # 保存するファイル名
-FILE = "padlet_export.md"
+FILE = "information.md"
 
 def main():
     print(f"Checking for updates: {URL}")
