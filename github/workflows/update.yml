@@ -1,0 +1,41 @@
+name: Padlet Auto Sync
+
+on:
+  schedule:
+    # 15分おきに実行
+    - cron: '*/15 * * * *'
+  workflow_dispatch: # 手動実行ボタン
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run update script
+        run: python update_padlet.py
+
+      - name: Commit and Push changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add padlet_export.md
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "chore: update padlet data"
+            git pull origin main --rebase
+            git push
+          fi
