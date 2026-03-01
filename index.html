@@ -83,20 +83,15 @@
 
         .card-content { font-size: 0.85rem; line-height: 1.6; color: #4b5563; overflow-wrap: break-word; }
         
-        /* 画像の最適化 */
-        .card-content img, .attachment-area img { 
-            max-width: 100%; height: auto; border-radius: 8px; 
-            margin: 8px 0; display: block; border: 1px solid #f3f4f6;
-        }
-
         .attachment-area { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+        .attachment-area img { max-width: 100%; height: auto; border-radius: 8px; border: 1px solid #f3f4f6; }
+
         .action-link {
             display: inline-block; font-size: 0.7rem; padding: 6px 12px; 
             background: #f3f4f6; border-radius: 6px; text-decoration: none; 
             color: #3b82f6 !important; font-weight: 600; border: 1px solid #e5e7eb;
             overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         }
-        .action-link:hover { background: #ebf2ff; border-color: #3b82f6; }
 
         /* Reactions */
         .reactions-section { margin-top: 12px; display: flex; align-items: center; gap: 12px; }
@@ -106,13 +101,13 @@
         /* Comments List */
         .comments-section { 
             margin-top: 12px; padding-top: 12px; border-top: 1px solid #f3f4f6; 
-            display: flex; flex-direction: column; gap: 6px;
+            display: flex; flex-direction: column; gap: 8px;
         }
-        .comment-item { font-size: 0.75rem; background: #f9fafb; padding: 8px; border-radius: 6px; border: 1px solid #f3f4f6; }
-        .comment-top { display: flex; justify-content: space-between; margin-bottom: 2px; }
+        .comment-item { font-size: 0.75rem; background: #f9fafb; padding: 10px; border-radius: 8px; border: 1px solid #f3f4f6; }
+        .comment-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
         .comment-user { font-weight: 700; color: #374151; }
-        .comment-date { font-size: 0.7rem; color: #9ca3af; }
-        .comment-msg { color: #4b5563; word-break: break-all; }
+        .comment-date { font-size: 0.65rem; color: #9ca3af; }
+        .comment-msg { color: #4b5563; line-height: 1.4; word-break: break-all; }
 
         /* Skeleton */
         .skeleton-card { background: #fff; height: 120px; border-radius: 10px; animation: pulse 1.5s infinite; }
@@ -160,7 +155,7 @@
 
                 renderBoard(markdownContent, canvas);
             } catch (error) {
-                canvas.innerHTML = `<div style="padding:20px; color:#ef4444;">データの読み込みに失敗しました。<br>Error: ${error.message}</div>`;
+                canvas.innerHTML = `<div style="padding:20px; color:#ef4444;">データの読み込みに失敗しました。</div>`;
             }
         }
 
@@ -206,23 +201,16 @@
             const date = getMeta(/\*\*Created At:\*\* (.*)/i) || '';
             const rating = parseFloat(getMeta(/star rating.*?([\d\.]+)/i) || 0);
 
-            // コンテンツの抽出
+            // コンテンツの抽出（メタデータ行を除外）
             let content = text.replace(/^.*?\n/, '').replace(/- \*\*.*?\*\*.*\n/g, '').split('####')[0].trim();
             
             let imageUrl = null;
             let linkInfo = [];
 
-            // 画像の抽出
-            content = content.replace(/!\[.*?\]\((.*?)\)/gi, (m, url) => { 
-                if (!imageUrl) imageUrl = url; 
-                return ''; 
-            });
-
-            // リンクの抽出
+            // 画像とリンクの抽出
+            content = content.replace(/!\[.*?\]\((.*?)\)/gi, (m, url) => { if (!imageUrl) imageUrl = url; return ''; });
             content = content.replace(/\[(.*?)\]\((.*?)\)/gi, (m, label, url) => {
-                if (!/\.(jpg|jpeg|png|gif|webp)$/i.test(url)) {
-                    linkInfo.push({ label: label, url: url });
-                }
+                if (!/\.(jpg|jpeg|png|gif|webp)$/i.test(url)) linkInfo.push({ label: label, url: url });
                 return ''; 
             });
 
@@ -234,17 +222,19 @@
 
         function parseComments(text) {
             const comments = [];
-            const match = text.match(/#### (?:Comments|コメント)\n([\s\S]*?)(?=####|$)/i);
+            // "#### Comments" セクションを探す
+            const match = text.match(/#### (?:Comments|コメント)[^\n]*\n([\s\S]*?)(?=####|$)/i);
             if (match) {
                 const commentLines = match[1].trim().split('\n');
                 commentLines.forEach(line => {
-                    // 書式 "- **User** (Date): Msg" または "- **User**: Msg" に対応
-                    const m = line.match(/- \*\*(.*?)\*\*(?:\s\((.*?)\))?: (.*)/);
+                    // 書式 1: - **Name** (Date): Msg
+                    // 書式 2: - **Name**: Msg
+                    const m = line.match(/- \*\*(.*?)\*\*(?:\s\((.*?)\))?:\s?(.*)/);
                     if (m) {
                         comments.push({ 
-                            user: m[1], 
-                            date: m[2] || '', 
-                            msg: m[3] 
+                            user: m[1].trim(), 
+                            date: m[2] ? m[2].trim() : '', 
+                            msg: m[3] ? m[3].trim() : '' 
                         });
                     }
                 });
@@ -272,12 +262,9 @@
                 </div>
                 
                 ${data.imageUrl ? `<div class="attachment-area"><img src="${data.imageUrl}"></div>` : ''}
-                
                 ${data.linkInfo.length > 0 ? `
                     <div class="attachment-area">
-                        ${data.linkInfo.map(link => `
-                            <a href="${link.url}" target="_blank" class="action-link">🔗 ${escapeHtml(link.label || 'リンクを開く')}</a>
-                        `).join('')}
+                        ${data.linkInfo.map(link => `<a href="${link.url}" target="_blank" class="action-link">🔗 ${escapeHtml(link.label || 'リンク')}</a>`).join('')}
                     </div>
                 ` : ''}
 
