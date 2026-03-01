@@ -1,0 +1,6 @@
+services:
+  - type: static
+    name: sennin-padlet-viewer
+    env: static
+    publishPath: .
+    pullRequestPreviewsEnabled: true
