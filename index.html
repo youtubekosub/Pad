@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Padlet Archive Viewer</title>
+    <title>gmail</title>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
     
@@ -89,12 +89,14 @@
             margin: 8px 0; display: block; border: 1px solid #f3f4f6;
         }
 
-        .attachment-area { margin-top: 12px; }
+        .attachment-area { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
         .action-link {
-            display: inline-block; font-size: 0.7rem; padding: 4px 10px; 
-            background: #f3f4f6; border-radius: 4px; text-decoration: none; 
-            color: #374151; font-weight: 600; margin-top: 4px;
+            display: inline-block; font-size: 0.7rem; padding: 6px 12px; 
+            background: #f3f4f6; border-radius: 6px; text-decoration: none; 
+            color: #3b82f6; font-weight: 600; border: 1px solid #e5e7eb;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         }
+        .action-link:hover { background: #ebf2ff; border-color: #3b82f6; }
 
         /* Reactions */
         .reactions-section { margin-top: 12px; display: flex; align-items: center; gap: 12px; }
@@ -144,11 +146,9 @@
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 const fullText = await response.text();
                 
-                // 投稿数の抽出
                 const postsMatch = fullText.match(/\*\*Posts:\*\* (\d+)/i);
                 metaInfoDiv.innerHTML = `<span>Total: ${postsMatch ? postsMatch[1] : '0'} posts</span>`;
 
-                // ヘッダーを除去してメインコンテンツへ
                 const splitIndex = fullText.indexOf('\n\n# ');
                 const markdownContent = splitIndex !== -1 ? fullText.substring(splitIndex + 2) : fullText;
 
@@ -157,16 +157,14 @@
 
                 renderBoard(markdownContent, canvas);
             } catch (error) {
-                canvas.innerHTML = `<div style="padding:20px; color:#ef4444;">データがまだ準備できていないか、読み込めませんでした。GitHub Actionsを確認してください。<br>Error: ${error.message}</div>`;
+                canvas.innerHTML = `<div style="padding:20px; color:#ef4444;">データの読み込みに失敗しました。<br>Error: ${error.message}</div>`;
             }
         }
 
         function renderBoard(markdownText, canvas) {
-            // ボードタイトル
             const titleMatch = markdownText.match(/^# (.*)/);
             if (titleMatch) document.getElementById('board-title').textContent = titleMatch[1];
 
-            // カラム（## セクション）で分割
             const columns = markdownText.split(/^## /gm);
             columns.forEach((colText, index) => {
                 if (index === 0 || !colText.trim()) return;
@@ -180,7 +178,6 @@
                 colDiv.innerHTML = `<div class="column-header">${escapeHtml(colTitle)}</div><div class="column-body"></div>`;
                 
                 const colBody = colDiv.querySelector('.column-body');
-                // カード（### セクション）で分割
                 const cardsData = colContent.split(/^### /gm);
 
                 cardsData.forEach(cardText => {
@@ -197,7 +194,6 @@
             const title = lines[0].trim();
             const getMeta = (regex) => { const m = text.match(regex); return m ? m[1].trim() : null; };
 
-            // メタ情報の抽出
             let authorRaw = getMeta(/\*\*Author:\*\* (.*)/i) || 'Unknown';
             let authorName = authorRaw, authorUrl = null;
             const authorMatch = authorRaw.match(/^(.*)\s\((.*)\)$/);
@@ -207,23 +203,42 @@
             const date = getMeta(/\*\*Created At:\*\* (.*)/i) || '';
             const rating = parseFloat(getMeta(/star rating.*?([\d\.]+)/i) || 0);
 
-            // 本文と画像の抽出
+            // コンテンツの抽出
             let content = text.replace(/^.*?\n/, '').replace(/- \*\*.*?\*\*.*\n/g, '').split('####')[0].trim();
+            
+            // 画像とリンクの高度な抽出
             let imageUrl = null;
-            // Markdownの画像タグがあれば抽出して削除
-            content = content.replace(/!\[.*?\]\((.*?)\)/i, (m, url) => { imageUrl = url; return ''; });
+            let linkInfo = [];
+
+            // 1. 画像を抽出（本文から除去）
+            content = content.replace(/!\[.*?\]\((.*?)\)/gi, (m, url) => { 
+                if (!imageUrl) imageUrl = url; 
+                return ''; 
+            });
+
+            // 2. リンクを抽出（「attachment1」のようなものを防ぎ、タイトルを保持）
+            content = content.replace(/\[(.*?)\]\((.*?)\)/gi, (m, label, url) => {
+                // 画像URLでなければリンク集に追加
+                if (!/\.(jpg|jpeg|png|gif|webp)$/i.test(url)) {
+                    linkInfo.push({ label: label, url: url });
+                }
+                return ''; // 本文からは一旦消して、後で専用エリアに表示
+            });
 
             return {
-                title, author: authorName, authorUrl, color, date, content, imageUrl, rating,
+                title, author: authorName, authorUrl, color, date, content, imageUrl, linkInfo, rating,
                 comments: parseComments(text)
             };
         }
 
         function parseComments(text) {
             const comments = [];
+            // "#### Comments" 以降のセクションを抽出
             const match = text.match(/#### Comments\n([\s\S]*?)(?=####|$)/i);
             if (match) {
-                match[1].trim().split('\n').forEach(line => {
+                // 各行（- **User**: Msg）をパース
+                const commentLines = match[1].trim().split('\n');
+                commentLines.forEach(line => {
                     const m = line.match(/- \*\*(.*?)\*\*.*?: (.*)/);
                     if (m) comments.push({ user: m[1], msg: m[2] });
                 });
@@ -240,7 +255,6 @@
             });
             el.className = `card ${colorClass}`;
 
-            // MarkdownをHTMLに変換（サニタイズ込み）
             const rawHtml = marked.parse(data.content);
             const cleanHtml = DOMPurify.sanitize(rawHtml);
 
@@ -250,12 +264,24 @@
                     ${data.authorUrl ? `<a href="${data.authorUrl}" target="_blank" class="author-link"><div class="icon icon-user"></div>${escapeHtml(data.author)}</a>` : `<span>${escapeHtml(data.author)}</span>`}
                     <span>${data.date.split(' ')[0]}</span>
                 </div>
-                ${data.imageUrl ? `<div class="attachment-area"><img src="${data.imageUrl}"><a href="${data.imageUrl}" target="_blank" class="action-link">📎 画像を表示</a></div>` : ''}
+                
+                ${data.imageUrl ? `<div class="attachment-area"><img src="${data.imageUrl}"></div>` : ''}
+                
+                ${data.linkInfo.length > 0 ? `
+                    <div class="attachment-area">
+                        ${data.linkInfo.map(link => `
+                            <a href="${link.url}" target="_blank" class="action-link">🔗 ${escapeHtml(link.label || 'リンクを開く')}</a>
+                        `).join('')}
+                    </div>
+                ` : ''}
+
                 <div class="card-content">${cleanHtml}</div>
+
                 <div class="reactions-section">
                     ${data.rating > 0 ? `<span class="stars"><div class="icon icon-star"></div> ${data.rating}</span>` : ''}
                     ${data.comments.length > 0 ? `<span class="comment-count"><div class="icon icon-comment"></div>${data.comments.length}</span>` : ''}
                 </div>
+
                 ${data.comments.length > 0 ? `
                     <div class="comments-section">
                         ${data.comments.map(c => `
