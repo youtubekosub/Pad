@@ -5,185 +5,276 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Padlet Archive Viewer</title>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
+    
     <style>
-        :root {
-            --bg-color: #e2e8f0;
-            --card-bg: #ffffff;
-            --accent: #4ade80; /* Padlet風のアクセントカラー */
-            --text-main: #1e293b;
-            --text-sub: #64748b;
+        /* --- CSS Custom Icons --- */
+        .icon { display: inline-block; position: relative; vertical-align: middle; margin-right: 8px; color: currentColor; }
+        .icon-board { width: 14px; height: 16px; border: 2px solid currentColor; border-radius: 2px; }
+        .icon-board::before { content: ''; position: absolute; top: -4px; left: 3px; width: 8px; height: 4px; background: currentColor; border-radius: 1px; }
+        .icon-user { width: 10px; height: 10px; border: 1.5px solid currentColor; border-radius: 50%; margin-bottom: 8px; }
+        .icon-user::after { content: ''; position: absolute; top: 11px; left: -3px; width: 16px; height: 6px; border: 1.5px solid currentColor; border-bottom: none; border-radius: 6px 6px 0 0; }
+        .icon-comment { width: 14px; height: 11px; border: 1.5px solid currentColor; border-radius: 3px; }
+        .icon-comment::after { content: ''; position: absolute; bottom: -4px; left: 3px; border-width: 4px 4px 0 0; border-style: solid; border-color: currentColor transparent transparent transparent; }
+        .icon-star { 
+            width: 0; height: 0; margin-right: 4px;
+            border-right: 7px solid transparent; border-bottom: 5px solid #f59e0b; border-left: 7px solid transparent;
+            transform: rotate(35deg); position: relative;
         }
+        .icon-star::before { content: ''; position: absolute; border-bottom: 4px solid #f59e0b; border-left: 3px solid transparent; border-right: 3px solid transparent; top: -3px; left: -5px; transform: rotate(-35deg); }
+        .icon-star::after { content: ''; position: absolute; top: 0; left: -7px; border-right: 7px solid transparent; border-bottom: 5px solid #f59e0b; border-left: 7px solid transparent; transform: rotate(-70deg); }
 
+        /* --- Global Style --- */
         body {
-            font-family: 'Inter', 'Noto Sans JP', sans-serif;
-            background-color: var(--bg-color);
-            background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
-            background-size: 20px 20px; /* 背景にうっすらドットを引いてPadlet感を演出 */
-            margin: 0;
-            padding: 20px;
-            color: var(--text-main);
+            margin: 0; padding: 0;
+            background-color: #f3f4f6; color: #1f2937;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            height: 100vh; display: flex; flex-direction: column; overflow: hidden;
         }
 
         header {
-            text-align: center;
-            padding: 40px 0;
-            animation: fadeInDown 0.8s ease-out;
+            padding: 0 24px; height: 60px;
+            background: #ffffff; border-bottom: 1px solid #e5e7eb;
+            display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;
+            z-index: 10;
+        }
+        header h1 { font-size: 1.1rem; font-weight: 700; display: flex; align-items: center; margin: 0; }
+        .meta-info { font-size: 0.8rem; color: #6b7280; display: flex; gap: 16px; }
+
+        /* --- Main Board --- */
+        #board-canvas { 
+            flex-grow: 1; overflow-x: auto; display: flex; 
+            padding: 24px; gap: 20px; align-items: flex-start; 
+            background-image: radial-gradient(#d1d5db 1px, transparent 1px);
+            background-size: 24px 24px;
         }
 
-        h1 {
-            font-size: 2.5rem;
-            margin: 0;
-            color: #0f172a;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        .column {
+            background: #e5e7eb; min-width: 320px; max-width: 320px;
+            border-radius: 12px; display: flex; flex-direction: column; max-height: 100%; flex-shrink: 0;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         }
 
-        /* グリッドレイアウト */
-        #content {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-            gap: 20px;
-            max-width: 1200px;
-            margin: 0 auto;
-        }
+        .column-header { padding: 16px; font-weight: 700; font-size: 0.9rem; color: #4b5563; }
+        .column-body { padding: 0 12px 12px 12px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
 
-        /* カードのスタイルとアニメーション */
+        /* --- Card --- */
         .card {
-            background: var(--card-bg);
-            border-radius: 16px;
-            padding: 20px;
-            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
-            border: 1px solid rgba(255,255,255,0.7);
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            opacity: 0;
-            transform: translateY(20px);
-            animation: fadeInUp 0.5s forwards;
-            position: relative;
-            overflow: hidden;
+            background: #ffffff; border-radius: 10px; padding: 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid transparent;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            animation: fadeIn 0.4s ease forwards;
+        }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .card:hover { transform: translateY(-3px); border-color: #d1d5db; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
+
+        /* Color Bars */
+        .card.color-red { border-top: 5px solid #ef4444; }
+        .card.color-yellow { border-top: 5px solid #f59e0b; }
+        .card.color-green { border-top: 5px solid #10b981; }
+        .card.color-blue { border-top: 5px solid #3b82f6; }
+        .card.color-purple { border-top: 5px solid #8b5cf6; }
+        .card.color-white { border-top: 5px solid #9ca3af; }
+
+        .card-title { font-size: 0.95rem; font-weight: 700; margin-bottom: 6px; color: #111827; }
+        .card-meta-header { font-size: 0.75rem; color: #9ca3af; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; }
+        .author-link { color: #3b82f6; text-decoration: none; font-weight: 600; display: flex; align-items: center; }
+
+        .card-content { font-size: 0.85rem; line-height: 1.6; color: #4b5563; overflow-wrap: break-word; }
+        
+        /* 画像の最適化 */
+        .card-content img, .attachment-area img { 
+            max-width: 100%; height: auto; border-radius: 8px; 
+            margin: 8px 0; display: block; border: 1px solid #f3f4f6;
         }
 
-        /* ホバー時のアニメーション */
-        .card:hover {
-            transform: translateY(-8px) scale(1.02);
-            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04);
-            border-color: var(--accent);
+        .attachment-area { margin-top: 12px; }
+        .action-link {
+            display: inline-block; font-size: 0.7rem; padding: 4px 10px; 
+            background: #f3f4f6; border-radius: 4px; text-decoration: none; 
+            color: #374151; font-weight: 600; margin-top: 4px;
         }
 
-        .card::before {
-            content: "";
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 6px;
-            background: var(--accent);
-            opacity: 0.8;
-        }
+        /* Reactions */
+        .reactions-section { margin-top: 12px; display: flex; align-items: center; gap: 12px; }
+        .stars { background: #fffbeb; color: #b45309; padding: 2px 8px; border-radius: 12px; font-size: 0.7rem; font-weight: 700; display: flex; align-items: center; }
+        .comment-count { font-size: 0.7rem; color: #9ca3af; display: flex; align-items: center; }
 
-        .meta {
-            font-size: 0.75rem;
-            color: var(--text-sub);
-            margin-bottom: 12px;
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
+        /* Comments List */
+        .comments-section { 
+            margin-top: 12px; padding-top: 12px; border-top: 1px solid #f3f4f6; 
+            display: flex; flex-direction: column; gap: 6px;
         }
+        .comment-item { font-size: 0.75rem; background: #f9fafb; padding: 8px; border-radius: 6px; border: 1px solid #f3f4f6; }
+        .comment-user { font-weight: 700; color: #374151; margin-right: 4px; }
 
-        .card h3 {
-            margin: 0 0 10px 0;
-            font-size: 1.25rem;
-            line-height: 1.4;
-        }
+        /* Skeleton */
+        .skeleton-card { background: #fff; height: 120px; border-radius: 10px; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
 
-        .card-body {
-            font-size: 0.95rem;
-            line-height: 1.6;
-            color: #334155;
-        }
-
-        /* アニメーション定義 */
-        @keyframes fadeInUp {
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        @keyframes fadeInDown {
-            from {
-                opacity: 0;
-                transform: translateY(-30px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        /* レスポンシブ調整 */
-        @media (max-width: 600px) {
-            #content { grid-template-columns: 1fr; }
-        }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
     </style>
 </head>
 <body>
 
-<header>
-    <h1 id="board-title">Padlet Archive</h1>
-</header>
+    <header>
+        <h1><div class="icon icon-board"></div><span id="board-title">読み込み中...</span></h1>
+        <div class="meta-info" id="meta-info">Loading...</div>
+    </header>
 
-<div id="content"></div>
+    <main id="board-canvas">
+        <div id="loading" style="display:flex; gap:20px; width:100%;">
+            <div class="column" style="padding:12px; gap:12px;"><div class="skeleton-card"></div><div class="skeleton-card"></div></div>
+            <div class="column" style="padding:12px; gap:12px;"><div class="skeleton-card"></div><div class="skeleton-card"></div></div>
+        </div>
+    </main>
 
-<script>
-    async function loadPadlet() {
-        const contentDiv = document.getElementById('content');
-        const titleH1 = document.getElementById('board-title');
+    <script>
+        const markdownUrl = './padlet_export.md';
 
-        try {
-            const response = await fetch('padlet_export.md?t=' + Date.now());
-            if (!response.ok) throw new Error('File not found');
-            const text = await response.text();
+        async function fetchAndRender() {
+            const canvas = document.getElementById('board-canvas');
+            const metaInfoDiv = document.getElementById('meta-info');
 
-            // タイトル抽出
-            const titleMatch = text.match(/^# (.*)/);
-            if (titleMatch) titleH1.textContent = titleMatch[1];
+            try {
+                const response = await fetch(`${markdownUrl}?t=${Date.now()}`);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const fullText = await response.text();
+                
+                // 投稿数の抽出
+                const postsMatch = fullText.match(/\*\*Posts:\*\* (\d+)/i);
+                metaInfoDiv.innerHTML = `<span>Total: ${postsMatch ? postsMatch[1] : '0'} posts</span>`;
 
-            // 投稿分割
-            const posts = text.split('---');
+                // ヘッダーを除去してメインコンテンツへ
+                const splitIndex = fullText.indexOf('\n\n# ');
+                const markdownContent = splitIndex !== -1 ? fullText.substring(splitIndex + 2) : fullText;
 
-            posts.forEach((post, index) => {
-                const trimmed = post.trim();
-                if (!trimmed || trimmed.startsWith('# ')) return;
+                const loading = document.getElementById('loading');
+                if (loading) loading.remove();
 
-                const card = document.createElement('div');
-                card.className = 'card';
-                // 表示に時間差をつけてパラパラと出す
-                card.style.animationDelay = `${index * 0.1}s`;
-
-                const lines = trimmed.split('\n');
-                let metaHtml = '';
-                let bodyMd = '';
-
-                lines.forEach(line => {
-                    if (line.startsWith('- **')) {
-                        metaHtml += `<span>${line.replace(/[-*]/g, '').trim()}</span>`;
-                    } else {
-                        bodyMd += line + '\n';
-                    }
-                });
-
-                card.innerHTML = `
-                    <div class="meta">${metaHtml}</div>
-                    <div class="card-body">${marked.parse(bodyMd)}</div>
-                `;
-                contentDiv.appendChild(card);
-            });
-
-        } catch (err) {
-            titleH1.textContent = "Error";
-            contentDiv.innerHTML = `<div class="card">データを読み込めませんでした。GitHub Actionsが完了しているか確認してください。</div>`;
+                renderBoard(markdownContent, canvas);
+            } catch (error) {
+                canvas.innerHTML = `<div style="padding:20px; color:#ef4444;">データがまだ準備できていないか、読み込めませんでした。GitHub Actionsを確認してください。<br>Error: ${error.message}</div>`;
+            }
         }
-    }
 
-    loadPadlet();
-</script>
+        function renderBoard(markdownText, canvas) {
+            // ボードタイトル
+            const titleMatch = markdownText.match(/^# (.*)/);
+            if (titleMatch) document.getElementById('board-title').textContent = titleMatch[1];
 
+            // カラム（## セクション）で分割
+            const columns = markdownText.split(/^## /gm);
+            columns.forEach((colText, index) => {
+                if (index === 0 || !colText.trim()) return;
+
+                const lines = colText.trim().split('\n');
+                const colTitle = lines[0];
+                const colContent = lines.slice(1).join('\n');
+
+                const colDiv = document.createElement('div');
+                colDiv.className = 'column';
+                colDiv.innerHTML = `<div class="column-header">${escapeHtml(colTitle)}</div><div class="column-body"></div>`;
+                
+                const colBody = colDiv.querySelector('.column-body');
+                // カード（### セクション）で分割
+                const cardsData = colContent.split(/^### /gm);
+
+                cardsData.forEach(cardText => {
+                    if (!cardText.trim()) return;
+                    const cardData = parseCard(cardText);
+                    colBody.appendChild(createCardElement(cardData));
+                });
+                canvas.appendChild(colDiv);
+            });
+        }
+
+        function parseCard(text) {
+            const lines = text.trim().split('\n');
+            const title = lines[0].trim();
+            const getMeta = (regex) => { const m = text.match(regex); return m ? m[1].trim() : null; };
+
+            // メタ情報の抽出
+            let authorRaw = getMeta(/\*\*Author:\*\* (.*)/i) || 'Unknown';
+            let authorName = authorRaw, authorUrl = null;
+            const authorMatch = authorRaw.match(/^(.*)\s\((.*)\)$/);
+            if (authorMatch) { authorName = authorMatch[1]; authorUrl = `https://padlet.com/${authorMatch[2]}`; }
+
+            const color = getMeta(/\*\*Color:\*\* (.*)/i) || 'White';
+            const date = getMeta(/\*\*Created At:\*\* (.*)/i) || '';
+            const rating = parseFloat(getMeta(/star rating.*?([\d\.]+)/i) || 0);
+
+            // 本文と画像の抽出
+            let content = text.replace(/^.*?\n/, '').replace(/- \*\*.*?\*\*.*\n/g, '').split('####')[0].trim();
+            let imageUrl = null;
+            // Markdownの画像タグがあれば抽出して削除
+            content = content.replace(/!\[.*?\]\((.*?)\)/i, (m, url) => { imageUrl = url; return ''; });
+
+            return {
+                title, author: authorName, authorUrl, color, date, content, imageUrl, rating,
+                comments: parseComments(text)
+            };
+        }
+
+        function parseComments(text) {
+            const comments = [];
+            const match = text.match(/#### Comments\n([\s\S]*?)(?=####|$)/i);
+            if (match) {
+                match[1].trim().split('\n').forEach(line => {
+                    const m = line.match(/- \*\*(.*?)\*\*.*?: (.*)/);
+                    if (m) comments.push({ user: m[1], msg: m[2] });
+                });
+            }
+            return comments;
+        }
+
+        function createCardElement(data) {
+            const el = document.createElement('div');
+            const c = data.color.toLowerCase();
+            let colorClass = 'color-white';
+            ['red', 'yellow', 'green', 'blue', 'purple'].forEach(color => { 
+                if (c.includes(color)) colorClass = `color-${color}`; 
+            });
+            el.className = `card ${colorClass}`;
+
+            // MarkdownをHTMLに変換（サニタイズ込み）
+            const rawHtml = marked.parse(data.content);
+            const cleanHtml = DOMPurify.sanitize(rawHtml);
+
+            el.innerHTML = `
+                <div class="card-title">${escapeHtml(data.title)}</div>
+                <div class="card-meta-header">
+                    ${data.authorUrl ? `<a href="${data.authorUrl}" target="_blank" class="author-link"><div class="icon icon-user"></div>${escapeHtml(data.author)}</a>` : `<span>${escapeHtml(data.author)}</span>`}
+                    <span>${data.date.split(' ')[0]}</span>
+                </div>
+                ${data.imageUrl ? `<div class="attachment-area"><img src="${data.imageUrl}"><a href="${data.imageUrl}" target="_blank" class="action-link">📎 画像を表示</a></div>` : ''}
+                <div class="card-content">${cleanHtml}</div>
+                <div class="reactions-section">
+                    ${data.rating > 0 ? `<span class="stars"><div class="icon icon-star"></div> ${data.rating}</span>` : ''}
+                    ${data.comments.length > 0 ? `<span class="comment-count"><div class="icon icon-comment"></div>${data.comments.length}</span>` : ''}
+                </div>
+                ${data.comments.length > 0 ? `
+                    <div class="comments-section">
+                        ${data.comments.map(c => `
+                            <div class="comment-item">
+                                <span class="comment-user">${escapeHtml(c.user)}:</span>
+                                <span>${escapeHtml(c.msg)}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                ` : ''}
+            `;
+            return el;
+        }
+
+        function escapeHtml(t) { 
+            return t ? t.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])) : ''; 
+        }
+
+        fetchAndRender();
+    </script>
 </body>
 </html>
