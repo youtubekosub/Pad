@@ -31,7 +31,7 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           if [ -f padlet_export.md ]; then
-            git add padlet_export.md
+            git add information.md
             if git diff --staged --quiet; then
               echo "No changes to commit"
             else
@@ -40,6 +40,6 @@ jobs:
               git push origin main
             fi
           else
-            echo "Error: padlet_export.md not found."
+            echo "Error: information.md not found."
             exit 1
           fi
