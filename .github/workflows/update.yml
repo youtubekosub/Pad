@@ -1,9 +1,10 @@
-Name: Padlet Auto Sync
+name: Padlet Auto Sync
 
 on:
   schedule:
+    # 15分おきに実行
     - cron: '*/15 * * * *'
-  workflow_dispatch:
+  workflow_dispatch: # 手動実行ボタンを有効化
 
 permissions:
   contents: write
@@ -11,9 +12,16 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # 実行が重なった際の衝突を防ぐ
+    concurrency:
+      group: padlet-sync
+      cancel-in-progress: true
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # 全履歴を取得してpushエラーを回避
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -30,12 +38,15 @@ jobs:
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
           if [ -f information.md ]; then
             git add information.md
+            # 差分がある場合のみコミット
             if git diff --staged --quiet; then
               echo "No changes to commit"
             else
-              git commit -m "chore: update padlet data"
+              git commit -m "chore: update padlet data [skip ci]"
+              # 他のジョブとの競合を防ぐためrebaseしてからpush
               git pull --rebase origin main
               git push origin main
             fi
