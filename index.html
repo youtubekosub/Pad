@@ -38,8 +38,25 @@
             display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;
             z-index: 10;
         }
-        header h1 { font-size: 1.1rem; font-weight: 700; display: flex; align-items: center; margin: 0; }
+        header h1 { font-size: 1.1rem; font-weight: 700; display: flex; align-items: center; margin: 0; cursor: pointer; user-select: none; }
         .meta-info { font-size: 0.8rem; color: #6b7280; display: flex; gap: 16px; }
+
+        /* --- Room Selector Window --- */
+        #room-overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.4); z-index: 100; justify-content: center; align-items: center;
+        }
+        .room-window {
+            background: white; padding: 24px; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+            width: 300px; text-align: center;
+        }
+        .room-window h2 { font-size: 1rem; margin-bottom: 16px; color: #374151; }
+        .room-btn {
+            display: block; width: 100%; padding: 12px; margin: 8px 0;
+            border: 1px solid #e5e7eb; border-radius: 8px; background: #f9fafb;
+            cursor: pointer; font-weight: 600; color: #4b5563; transition: background 0.2s;
+        }
+        .room-btn:hover { background: #eff6ff; border-color: #3b82f6; color: #3b82f6; }
 
         /* --- Main Board --- */
         #board-canvas { 
@@ -69,7 +86,6 @@
         
         .card:hover { transform: translateY(-3px); border-color: #d1d5db; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
 
-        /* Color classes from Post color info */
         .card.color-red { border-top: 5px solid #ef4444; }
         .card.color-yellow { border-top: 5px solid #f59e0b; }
         .card.color-green { border-top: 5px solid #10b981; }
@@ -120,9 +136,20 @@
 <body>
 
     <header>
-        <h1><div class="icon icon-board"></div><span id="board-title">読み込み中...</span></h1>
+        <h1 id="header-title" ondblclick="showRoomSelector()">
+            <div class="icon icon-board"></div>
+            <span id="board-title">読み込み中...</span>
+        </h1>
         <div class="meta-info" id="meta-info">Loading...</div>
     </header>
+
+    <div id="room-overlay" onclick="hideRoomSelector()">
+        <div class="room-window" onclick="event.stopPropagation()">
+            <h2>部屋を選択</h2>
+            <button class="room-btn" onclick="changeRoom('./information.md')">proxyなど教える会</button>
+            <button class="room-btn" onclick="changeRoom('https://raw.githubusercontent.com/toka-kun/Padlet-Viewer/main/padlet_export.md')">Toka_kun</button>
+        </div>
+    </div>
 
     <main id="board-canvas">
         <div id="loading" style="display:flex; gap:20px; width:100%;">
@@ -132,14 +159,34 @@
     </main>
 
     <script>
-        const markdownUrl = './information.md';
+        let currentMarkdownUrl = './information.md';
+
+        function showRoomSelector() {
+            document.getElementById('room-overlay').style.display = 'flex';
+        }
+
+        function hideRoomSelector() {
+            document.getElementById('room-overlay').style.display = 'none';
+        }
+
+        function changeRoom(url) {
+            currentMarkdownUrl = url;
+            hideRoomSelector();
+            const canvas = document.getElementById('board-canvas');
+            canvas.innerHTML = `
+                <div id="loading" style="display:flex; gap:20px; width:100%;">
+                    <div class="column" style="padding:12px; gap:12px;"><div class="skeleton-card"></div><div class="skeleton-card"></div></div>
+                    <div class="column" style="padding:12px; gap:12px;"><div class="skeleton-card"></div><div class="skeleton-card"></div></div>
+                </div>`;
+            fetchAndRender();
+        }
 
         async function fetchAndRender() {
             const canvas = document.getElementById('board-canvas');
             const metaInfoDiv = document.getElementById('meta-info');
 
             try {
-                const response = await fetch(`${markdownUrl}?t=${Date.now()}`);
+                const response = await fetch(`${currentMarkdownUrl}`);
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 const fullText = await response.text();
                 
@@ -154,11 +201,15 @@
 
                 renderBoard(markdownContent, canvas);
             } catch (error) {
-                canvas.innerHTML = `<div style="padding:20px; color:#ef4444;">ファイルの読み込みに失敗しました（${markdownUrl}）</div>`;
+                canvas.innerHTML = `<div style="padding:20px; color:#ef4444;">ファイルの読み込みに失敗しました（${currentMarkdownUrl}）</div>`;
             }
         }
 
         function renderBoard(markdownText, canvas) {
+            // 清掃
+            const existingColumns = canvas.querySelectorAll('.column');
+            existingColumns.forEach(c => c.remove());
+
             const titleMatch = markdownText.match(/^# (.*)/);
             if (titleMatch) document.getElementById('board-title').textContent = titleMatch[1];
 
@@ -191,18 +242,16 @@
             const title = lines[0].trim();
             const getMeta = (regex) => { const m = text.match(regex); return m ? m[1].trim() : null; };
 
-            // "Post color:" または "**Color:**" の両方に対応
             const color = getMeta(/Post color:\s*(.*)/i) || getMeta(/\*\*Color:\*\* (.*)/i) || 'White';
             const date = getMeta(/Created At \(UTC\):\s*(.*)/i) || getMeta(/\*\*Created At:\*\* (.*)/i) || '';
             const rating = parseFloat(getMeta(/star rating.*?([\d\.]+)/i) || 0);
 
-            // Summaryを削除し、メタデータ行を除外
-            let content = text.replace(/^.*?\n/, '') // タイトル削除
-                              .replace(/#### Summary[\s\S]*?(?=####|$)/i, '') // Summaryセクション削除
+            let content = text.replace(/^.*?\n/, '') 
+                              .replace(/#### Summary[\s\S]*?(?=####|$)/i, '') 
                               .replace(/Post color:.*\n/gi, '')
                               .replace(/Created At \(UTC\):.*\n/gi, '')
                               .replace(/Updated At \(UTC\):.*\n/gi, '')
-                              .replace(/- \*\*.*?\*\*.*\n/g, '') // その他のメタデータ削除
+                              .replace(/- \*\*.*?\*\*.*\n/g, '') 
                               .split('####')[0].trim();
             
             let imageUrl = null;
