@@ -23,31 +23,33 @@ def main():
         # ステータスチェック
         if res.status_code != 200:
             print(f"❌ Error: Status code {res.status_code}")
-            # Actionsを失敗扱いにせず終了（一時的なネットワークエラー対策）
             sys.exit(0)
             
         new_body = res.text.strip()
 
         # 中身がHTML（ログイン画面等）になっていないか厳格にチェック
-        if new_body.startswith("<!DOCTYPE html>") or "<html" in new_body.lower():
-            print("⚠️ Warning: Received HTML error page. Skipping update to protect existing data.")
+        if not new_body or new_body.startswith("<!DOCTYPE html>") or "<html" in new_body.lower():
+            print("⚠️ Warning: Received invalid content or HTML error page. Skipping update.")
             sys.exit(0)
         
         # 2. 変更チェック（既存ファイルがある場合）
         existing_body = ""
         if os.path.exists(FILE):
             with open(FILE, "r", encoding="utf-8") as f:
-                lines = f.readlines()
-                # 最初の2行（最終更新日時ヘッダー）を飛ばして本文のみを比較
-                if len(lines) >= 2:
-                    existing_body = "".join(lines[2:]).strip()
+                content = f.read()
+                # 「最終更新: ...」の行（1行目）と空行（2行目）を除去して本文を取り出す
+                parts = content.split('\n\n', 1)
+                if len(parts) > 1:
+                    existing_body = parts[1].strip()
+                else:
+                    existing_body = content.strip()
         
-        # 内容に変化がなければ終了（無駄なコミットを防止）
+        # 内容に変化がなければ終了
         if new_body == existing_body:
             print("✅ No changes detected in Padlet content.")
             return
 
-        # 3. ファイルの保存（日本時間 JST でタイムスタンプを付与）
+        # 3. ファイルの保存（日本時間 JST）
         now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=9)))
         timestamp = now.strftime("%Y/%m/%d %H:%M:%S")
 
@@ -59,7 +61,6 @@ def main():
 
     except Exception as e:
         print(f"❌ Critical Error: {e}")
-        # 致命的なエラーの場合はActionsに通知するため1で終了
         sys.exit(1)
 
 if __name__ == "__main__":
