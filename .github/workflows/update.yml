@@ -2,8 +2,8 @@ name: Padlet Auto Sync
 
 on:
   schedule:
-    # 15分おきに実行
-    - cron: '*/15 * * * *'
+    # 1分おきに実行
+    - cron: '* * * * *'
   workflow_dispatch: # 手動実行ボタンを有効化
 
 permissions:
@@ -39,6 +39,7 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           
+          # information.mdが存在するか確認
           if [ -f information.md ]; then
             git add information.md
             # 差分がある場合のみコミット
@@ -46,7 +47,7 @@ jobs:
               echo "No changes to commit"
             else
               git commit -m "chore: update padlet data [skip ci]"
-              # 他のジョブとの競合を防ぐためrebaseしてからpush
+              # 他のジョブとの競合を防ぐため、最新状態を取り込んでからpush
               git pull --rebase origin main
               git push origin main
             fi
